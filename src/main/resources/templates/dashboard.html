@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>Stock Watchlist</title>
+  <meta charset="UTF-8" />
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { padding: 10px; border: 1px solid #ccc; text-align: center; }
+  </style>
+</head>
+<body>
+<h1>📈 Real-Time Stock Watchlist</h1>
+
+<form action="/watch" method="post">
+  <input type="text" name="symbol" placeholder="Enter stock symbol (e.g. AAPL)" required>
+  <button type="submit">Watch</button>
+</form>
+
+<table>
+  <thead>
+  <tr>
+    <th>Symbol</th>
+    <th>Latest Price</th>
+    <th>Moving Avg</th>
+    <th>Max</th>
+    <th>Min</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:each="stock : ${stats}">
+    <td th:text="${stock.symbol}"></td>
+    <td th:text="${stock.latestPrice}"></td>
+    <td th:text="${stock.average}"></td>
+    <td th:text="${stock.max}"></td>
+    <td th:text="${stock.min}"></td>
+    <td>
+      <form action="/unwatch" method="post">
+        <input type="hidden" name="symbol" th:value="${stock.symbol}" />
+        <button type="submit">Remove</button>
+      </form>
+    </td>
+  </tr>
+  </tbody>
+</table>
+
+<p>Refresh the page to see live updates every 5 seconds.</p>
+</body>
+</html>
