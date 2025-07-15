@@ -13,6 +13,38 @@ This is a full-stack real-time stock market analysis web application that showca
 - 🧱 **Spring Boot REST API** backend serving OHLC data to frontend
 - ✨ Designed with a clean dark UI
 
+## 🎨 Marker Legend (Candlestick Patterns)
+
+The chart displays colored circle markers representing detected candlestick patterns:
+
+| Color     | Pattern Name          | Meaning / Description                   |
+| --------- | --------------------- | --------------------------------------- |
+| 🟠 Orange | **Doji**              | Market indecision, possible reversal    |
+| 🟢 Green  | **Bullish Engulfing** | Potential bullish reversal              |
+| 🔴 Red    | **Bearish Engulfing** | Potential bearish reversal              |
+| 🔵 Blue   | **Hammer**            | Bullish reversal at bottom of downtrend |
+| 🌸 Pink   | **Shooting Star**     | Bearish reversal at top of uptrend      |
+| 🟢 Green  | **Morning Star**      | Bullish 3-candle reversal pattern       |
+| 🔴 Red    | **Evening Star**      | Bearish 3-candle reversal pattern       |
+
+## 📈 Moving Averages (MA) Explained
+
+Moving Averages (MAs) are one of the most popular technical indicators used in trading to smooth out price data and help identify trends over different periods.
+
+* **MA5 (5-period Moving Average)**
+  Tracks the average price over the last 5 candles. It reacts quickly to recent price changes and is used to capture short-term trends.
+
+* **MA10 (10-period Moving Average)**
+  Represents the average price over the last 10 candles. It smooths out more noise than the MA5 and is commonly used to identify intermediate-term trends.
+
+* **MA20 (20-period Moving Average)**
+  Calculates the average over 20 candles, showing longer-term trend direction. It reacts slower to price changes and helps confirm major trend shifts.
+
+### How MAs are used in this project:
+
+* Crossovers between these MAs (e.g., MA5 crossing above MA10) often signal potential buy or sell opportunities.
+* The different speeds of MAs help indicate whether a stock is trending upward, downward, or moving sideways.
+* Combined with momentum analysis, these MAs contribute to the trading signal engine generating **Buy**, **Sell**, or **Hold** recommendations.
 
 ## 💡 Motivation
 
