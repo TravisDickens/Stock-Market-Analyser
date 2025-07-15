@@ -1,5 +1,6 @@
 package com.travis.stock_analyser.controller;
 
+import com.travis.stock_analyser.dto.PriceRecord;
 import com.travis.stock_analyser.fetcher.StockPriceFetcherService;
 import com.travis.stock_analyser.service.MultiSymbolPriceService;
 import com.travis.stock_analyser.service.PriceWindowService;
@@ -8,10 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/stocks")
@@ -79,6 +77,21 @@ public class StockController
     @GetMapping("/watchlist")
     public ResponseEntity<Set<String>> getWatchedSymbols() {
         return ResponseEntity.ok(watchedSymbolsService.getWatchedSymbols());
+    }
+    @GetMapping("/{symbol}/ohlc")
+    public ResponseEntity<List<PriceRecord>> getHistoricalPrices(
+            @PathVariable String symbol,
+            @RequestParam(defaultValue = "1min") String interval) {
+
+        System.out.println("Fetching OHLC data for " + symbol + " with interval " + interval);
+
+        List<PriceRecord> history = priceFetcherService.fetchHistoricalPrices(symbol, interval);
+
+        if (history.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).body(Collections.emptyList());
+        }
+
+        return ResponseEntity.ok(history);
     }
 
 

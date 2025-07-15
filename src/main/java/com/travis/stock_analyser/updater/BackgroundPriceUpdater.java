@@ -22,7 +22,7 @@ public class BackgroundPriceUpdater
         this.priceService = priceService;
     }
 
-    @Scheduled(fixedRate = 5000) // every 5 seconds
+    @Scheduled(fixedRate = 15000) // every 5 seconds
     public void updateWatchedSymbols() {
         for (String symbol : watchedSymbolsService.getWatchedSymbols()) {
             double price = fetcherService.fetchLatestPrice(symbol);

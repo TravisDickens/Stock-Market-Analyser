@@ -1,50 +1,608 @@
+
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en">
 <head>
-  <title>Stock Watchlist</title>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Real-Time Stock Watchlist</title>
+  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+
   <style>
-    body { font-family: Arial; padding: 20px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { padding: 10px; border: 1px solid #ccc; text-align: center; }
+    /* Reset & base */
+    body, html {
+      margin: 0; padding: 0; height: 100%;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #1e1e2f;
+      color: #e0e0e0;
+      overflow: hidden;
+    }
+
+    #app {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    #sidebar {
+      width: 280px;
+      background: #252538;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #sidebar h2 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-weight: 600;
+      font-size: 1.5rem;
+      color: #74b9ff;
+      user-select: none;
+    }
+
+    #stockSearchContainer {
+      margin-bottom: 15px;
+    }
+
+    #stockSearchInput {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: none;
+      box-sizing: border-box;
+    }
+
+    #stockSearchInput:focus {
+      outline: none;
+      box-shadow: 0 0 5px #74b9ff;
+      background: #323251;
+      color: #e0e0e0;
+    }
+
+    #stockList {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    #stockList li {
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      background: #323251;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.3s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #stockList li:hover {
+      background: #4050a0;
+    }
+
+    #stockList li.active {
+      background: #74b9ff;
+      color: #1e1e2f;
+      font-weight: 700;
+    }
+
+    /* Main content */
+    #main {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      background: #121224;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    /* Header */
+    #main header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    #main header h1 {
+      margin: 0;
+      font-weight: 700;
+      font-size: 1.8rem;
+      user-select: none;
+    }
+
+    /* Controls */
+    #controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button.timeframe-btn {
+      background: #323251;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 4px;
+      color: #a0a0c0;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.25s;
+      user-select: none;
+    }
+
+    button.timeframe-btn.active,
+    button.timeframe-btn:hover {
+      background: #74b9ff;
+      color: #1e1e2f;
+    }
+
+    #refreshBtn {
+      background: #4caf50;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 4px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.3s;
+    }
+
+    #refreshBtn:hover {
+      background: #388e3c;
+    }
+
+    #chartStatus {
+      margin-left: 16px;
+      font-size: 0.9rem;
+      color: #a0a0c0;
+      user-select: none;
+    }
+
+    /* Chart container */
+    #chartContainer {
+      flex-grow: 1;
+      position: relative;
+    }
+
+    /* Loading overlay */
+    #loadingOverlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(30, 30, 47, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #74b9ff;
+      font-size: 1.3rem;
+      user-select: none;
+      z-index: 10;
+    }
+
+    /* Signal Box */
+    #signalBox {
+      margin-top: 12px;
+      font-weight: 700;
+      font-size: 1.2rem;
+      user-select: none;
+      min-height: 30px;
+    }
   </style>
 </head>
 <body>
-<h1>📈 Real-Time Stock Watchlist</h1>
+<div id="app">
+  <nav id="sidebar">
+    <h2>Watchlist</h2>
+    <div id="stockSearchContainer">
+      <input
+              id="stockSearchInput"
+              type="text"
+              placeholder="Search or add symbol (e.g. AAPL)"
+              autocomplete="off"
+      />
+    </div>
+    <ul id="stockList">
+      <!-- Stocks will be populated here -->
+    </ul>
+  </nav>
 
-<form action="/watch" method="post">
-  <input type="text" name="symbol" placeholder="Enter stock symbol (e.g. AAPL)" required>
-  <button type="submit">Watch</button>
-</form>
+  <main id="main">
+    <header>
+      <h1 id="chartTitle">Select a stock</h1>
+      <div id="controls">
+        <button class="timeframe-btn active" data-interval="1min">1M</button>
+        <button class="timeframe-btn" data-interval="5min">5M</button>
+        <button class="timeframe-btn" data-interval="15min">15M</button>
+        <button class="timeframe-btn" data-interval="30min">30M</button>
+        <button class="timeframe-btn" data-interval="1h">1H</button>
+        <button class="timeframe-btn" data-interval="1day">1D</button>
+        <button id="refreshBtn">Refresh</button>
+        <span id="chartStatus"></span>
+      </div>
+    </header>
+    <div id="chartContainer"></div>
+    <div id="signalBox"></div>
+    <div id="loadingOverlay" style="display:none;">Loading...</div>
+  </main>
+</div>
 
-<table>
-  <thead>
-  <tr>
-    <th>Symbol</th>
-    <th>Latest Price</th>
-    <th>Moving Avg</th>
-    <th>Max</th>
-    <th>Min</th>
-    <th>Actions</th>
-  </tr>
-  </thead>
-  <tbody>
-  <tr th:each="stock : ${stats}">
-    <td th:text="${stock.symbol}"></td>
-    <td th:text="${stock.latestPrice}"></td>
-    <td th:text="${stock.average}"></td>
-    <td th:text="${stock.max}"></td>
-    <td th:text="${stock.min}"></td>
-    <td>
-      <form action="/unwatch" method="post">
-        <input type="hidden" name="symbol" th:value="${stock.symbol}" />
-        <button type="submit">Remove</button>
-      </form>
-    </td>
-  </tr>
-  </tbody>
-</table>
+<script>
+  const stockSymbols = ['AAPL', 'MSFT', 'GOOG', 'TSLA', 'AMZN', 'FB', 'NFLX', 'NVDA'];
+  let currentSymbol = null;
+  let currentInterval = '1min';
+  let chart, candleSeries;
+  let maSeries = [];
+  const maPeriods = [5, 10, 20];
 
-<p>Refresh the page to see live updates every 5 seconds.</p>
+  const stockListEl = document.getElementById('stockList');
+  const chartContainer = document.getElementById('chartContainer');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const chartTitle = document.getElementById('chartTitle');
+  const chartStatus = document.getElementById('chartStatus');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const timeframeButtons = document.querySelectorAll('button.timeframe-btn');
+  const stockSearchInput = document.getElementById('stockSearchInput');
+  const signalBox = document.getElementById('signalBox');
+
+  function createStockList() {
+    stockListEl.innerHTML = '';
+    stockSymbols.forEach(symbol => {
+      const li = document.createElement('li');
+      li.textContent = symbol;
+      li.dataset.symbol = symbol;
+      li.addEventListener('click', () => {
+        if(symbol === currentSymbol) return;
+        selectStock(symbol);
+      });
+      stockListEl.appendChild(li);
+    });
+  }
+
+  function setActiveStockInList(symbol) {
+    Array.from(stockListEl.children).forEach(li => {
+      li.classList.toggle('active', li.dataset.symbol === symbol);
+    });
+  }
+
+  function showLoading(show) {
+    loadingOverlay.style.display = show ? 'flex' : 'none';
+  }
+
+  function calculateMA(data, period) {
+    const maData = [];
+    for (let i = period - 1; i < data.length; i++) {
+      let sum = 0;
+      for (let j = i - period + 1; j <= i; j++) {
+        sum += data[j].close;
+      }
+      maData.push({ time: data[i].time, value: sum / period });
+    }
+    return maData;
+  }
+
+  function lastMAIndex(maArray, time) {
+    for (let i = maArray.length - 1; i >= 0; i--) {
+      if (maArray[i].time <= time) return i;
+    }
+    return maArray.length - 1;
+  }
+
+  // Combined MA crossover + momentum with weighting to decide strongest signal
+  function getTradingSignal(candles) {
+    if (candles.length < 20) return { signal: 'hold', explanation: 'Insufficient data' };
+
+    const ma5 = calculateMA(candles, 5);
+    const ma10 = calculateMA(candles, 10);
+    const ma20 = calculateMA(candles, 20);
+
+    const lastIndex = ma5.length - 1;
+
+    const prevMA5 = ma5[lastIndex - 1].value;
+    const prevMA10 = ma10[lastMAIndex(ma10, ma5[lastIndex - 1].time)].value;
+    const currMA5 = ma5[lastIndex].value;
+    const currMA10 = ma10[lastMAIndex(ma10, ma5[lastIndex].time)].value;
+
+    const prevMA20 = ma20[lastMAIndex(ma20, ma5[lastIndex - 1].time)].value;
+    const currMA20 = ma20[lastMAIndex(ma20, ma5[lastIndex].time)].value;
+
+    const lastClose = candles[candles.length - 1].close;
+    const prevClose = candles[candles.length - 2].close;
+    const momentum = lastClose - prevClose;
+
+    // Signals based on crossovers with momentum
+    let signals = [];
+
+    // MA5/MA10 crossover
+    if (prevMA5 <= prevMA10 && currMA5 > currMA10 && momentum > 0) {
+      signals.push({ type: 'buy', strength: Math.abs(currMA5 - currMA10), explanation: 'MA5 crossed above MA10 with positive momentum' });
+    }
+    if (prevMA5 >= prevMA10 && currMA5 < currMA10 && momentum < 0) {
+      signals.push({ type: 'sell', strength: Math.abs(currMA5 - currMA10), explanation: 'MA5 crossed below MA10 with negative momentum' });
+    }
+
+    // MA5/MA20 crossover
+    if (prevMA5 <= prevMA20 && currMA5 > currMA20 && momentum > 0) {
+      signals.push({ type: 'buy', strength: Math.abs(currMA5 - currMA20), explanation: 'MA5 crossed above MA20 with positive momentum' });
+    }
+    if (prevMA5 >= prevMA20 && currMA5 < currMA20 && momentum < 0) {
+      signals.push({ type: 'sell', strength: Math.abs(currMA5 - currMA20), explanation: 'MA5 crossed below MA20 with negative momentum' });
+    }
+
+    // Momentum alone strong up or down moves
+    if(momentum > (lastClose * 0.002)) { // >0.2% move up last candle
+      signals.push({ type: 'buy', strength: momentum, explanation: 'Strong positive price momentum' });
+    } else if(momentum < -(lastClose * 0.002)) { // >0.2% move down last candle
+      signals.push({ type: 'sell', strength: -momentum, explanation: 'Strong negative price momentum' });
+    }
+
+    if(signals.length === 0) {
+      return { signal: 'hold', explanation: 'No strong crossover or momentum signals' };
+    }
+
+    // Pick strongest signal by strength
+    signals.sort((a,b) => b.strength - a.strength);
+    const topSignal = signals[0];
+
+    return {
+      signal: topSignal.type,
+      explanation: topSignal.explanation
+    };
+  }
+
+  // Expanded candlestick pattern detection with simpler logic and added patterns
+  function detectPatterns(data) {
+    const patterns = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const prev = data[i - 1];
+      const curr = data[i];
+
+      const body = Math.abs(curr.open - curr.close);
+      const range = curr.high - curr.low;
+      const bodyRatio = body / range;
+
+      // Doji: very small body
+      if (bodyRatio < 0.1) {
+        patterns.push({ index: i, name: "Doji", color: "#ffa726", description: "Indecision in market, possible reversal." });
+        continue;
+      }
+
+      // Bullish Engulfing
+      if (prev.close < prev.open && curr.close > curr.open &&
+          curr.close > prev.open && curr.open < prev.close) {
+        patterns.push({ index: i, name: "Bullish Engulfing", color: "#4caf50", description: "Possible upward reversal." });
+        continue;
+      }
+
+      // Bearish Engulfing
+      if (prev.close > prev.open && curr.close < curr.open &&
+          curr.open > prev.close && curr.close < prev.open) {
+        patterns.push({ index: i, name: "Bearish Engulfing", color: "#f44336", description: "Possible downward reversal." });
+        continue;
+      }
+
+      // Hammer: long lower wick, small body near top
+      const lowerWick = Math.min(curr.open, curr.close) - curr.low;
+      const upperWick = curr.high - Math.max(curr.open, curr.close);
+      if (lowerWick / range > 0.5 && bodyRatio < 0.3 && upperWick < body) {
+        patterns.push({ index: i, name: "Hammer", color: "#2196f3", description: "Bullish reversal at bottom of trend." });
+        continue;
+      }
+
+      // Shooting Star: long upper wick, small body near bottom
+      if (upperWick / range > 0.6 && bodyRatio < 0.3 && lowerWick < body) {
+        patterns.push({ index: i, name: "Shooting Star", color: "#e91e63", description: "Bearish reversal at top of trend." });
+        continue;
+      }
+
+      // Morning Star (3-candle pattern)
+      if (i >= 2) {
+        const c1 = data[i-2], c2 = data[i-1], c3 = curr;
+        if (
+          c1.close < c1.open && // first candle bearish
+          c2.open < c2.close && c2.close < c1.close && // second candle small body down gap down
+          c3.open > c3.close && c3.close > c2.close // third candle bullish closing well above second
+        ) {
+          patterns.push({ index: i, name: "Morning Star", color: "#4caf50", description: "Bullish 3-candle reversal." });
+          continue;
+        }
+      }
+
+      // Evening Star (3-candle pattern)
+      if (i >= 2) {
+        const c1 = data[i-2], c2 = data[i-1], c3 = curr;
+        if (
+          c1.close > c1.open && // first candle bullish
+          c2.open > c2.close && c2.close > c1.close && // second candle small body up gap up
+          c3.open < c3.close && c3.close < c2.close // third candle bearish closing well below second
+        ) {
+          patterns.push({ index: i, name: "Evening Star", color: "#f44336", description: "Bearish 3-candle reversal." });
+          continue;
+        }
+      }
+    }
+
+    return patterns;
+  }
+
+  function addPatternMarkers(patterns, data) {
+    if (candleSeries && candleSeries.setMarkers) {
+      const markers = patterns.map(p => ({
+        time: data[p.index].time,
+        position: 'aboveBar',
+        color: p.color,
+        shape: 'circle',
+        tooltip: `${p.name}: ${p.description}`
+      }));
+      candleSeries.setMarkers(markers);
+    }
+  }
+
+  async function loadChart(symbol, interval) {
+    showLoading(true);
+    chartStatus.textContent = '';
+    chartTitle.textContent = symbol;
+    signalBox.textContent = '';
+    signalBox.style.color = '';
+    if(candleSeries) candleSeries.setMarkers([]);
+
+    try {
+      const res = await fetch(`/api/stocks/${symbol}/ohlc?interval=${interval}`);
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const rawData = await res.json();
+
+      if (!rawData.length) {
+        chartStatus.textContent = 'No data for ' + symbol;
+        showLoading(false);
+        return;
+      }
+
+      const candlestickData = rawData.map(d => ({
+        time: Math.floor(new Date(d.timestamp).getTime() / 1000),
+        open: +d.open,
+        high: +d.high,
+        low: +d.low,
+        close: +d.close,
+      }));
+
+      candlestickData.sort((a, b) => a.time - b.time);
+
+      if (!chart) {
+        chart = LightweightCharts.createChart(chartContainer, {
+          width: chartContainer.clientWidth,
+          height: chartContainer.clientHeight,
+          layout: { backgroundColor: '#1e1e2f', textColor: '#e0e0e0' },
+          grid: { vertLines: { color: '#333' }, horzLines: { color: '#333' } },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+          rightPriceScale: { borderColor: '#444' },
+          timeScale: { borderColor: '#444', timeVisible: true, secondsVisible: false },
+        });
+
+        candleSeries = chart.addCandlestickSeries({
+          upColor: '#4caf50',
+          downColor: '#f44336',
+          borderVisible: false,
+          wickUpColor: '#4caf50',
+          wickDownColor: '#f44336',
+        });
+
+        maPeriods.forEach((period, idx) => {
+          const color = ['#2196F3', '#FFC107', '#9C27B0'][idx % 3];
+          const series = chart.addLineSeries({ color, lineWidth: 2, title: `MA(${period})` });
+          maSeries.push(series);
+        });
+
+        window.addEventListener('resize', () => {
+          chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+        });
+      }
+
+      candleSeries.setData(candlestickData);
+
+      maPeriods.forEach((period, idx) => {
+        const maData = calculateMA(candlestickData, period);
+        maSeries[idx].setData(maData);
+      });
+
+      chart.timeScale().fitContent();
+
+      const detectedPatterns = detectPatterns(candlestickData);
+      addPatternMarkers(detectedPatterns, candlestickData);
+
+      if (detectedPatterns.length) {
+        const recent = detectedPatterns[detectedPatterns.length - 1];
+        signalBox.textContent = `Pattern Detected: ${recent.name} — ${recent.description}`;
+        signalBox.style.color = recent.color;
+      } else {
+        const signalResult = getTradingSignal(candlestickData);
+        const colorMap = {
+          buy: '#4caf50',
+          sell: '#f44336',
+          hold: '#ffc107',
+        };
+        signalBox.textContent = `${signalResult.signal.toUpperCase()} - ${signalResult.explanation}`;
+        signalBox.style.color = colorMap[signalResult.signal] || '#ffc107';
+      }
+
+      chartStatus.textContent = `Loaded ${candlestickData.length} candles`;
+
+    } catch (e) {
+      chartStatus.textContent = 'Error loading chart: ' + e.message;
+      console.error(e);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  function selectStock(symbol) {
+    currentSymbol = symbol;
+    setActiveStockInList(symbol);
+    loadChart(symbol, currentInterval);
+  }
+
+  timeframeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      timeframeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentInterval = btn.dataset.interval;
+      if (currentSymbol) loadChart(currentSymbol, currentInterval);
+    });
+  });
+
+  refreshBtn.addEventListener('click', () => {
+    if (currentSymbol) loadChart(currentSymbol, currentInterval);
+  });
+
+  stockSearchInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const symbol = stockSearchInput.value.trim().toUpperCase();
+      if (!symbol) return;
+
+      if (stockSymbols.includes(symbol)) {
+        selectStock(symbol);
+        stockSearchInput.value = '';
+        return;
+      }
+
+      try {
+        showLoading(true);
+        chartStatus.textContent = `Validating symbol: ${symbol}...`;
+
+        const res = await fetch(`/api/stocks/${symbol}/ohlc?interval=${currentInterval}`);
+        if (!res.ok) throw new Error(`API error ${res.status}`);
+        const data = await res.json();
+
+        if (!data.length) throw new Error('No data found for symbol');
+
+        stockSymbols.push(symbol);
+        createStockList();
+        selectStock(symbol);
+
+        chartStatus.textContent = `Added new symbol: ${symbol}`;
+        stockSearchInput.value = '';
+
+      } catch (err) {
+        chartStatus.textContent = `Invalid symbol or no data: ${symbol}`;
+        console.warn(err);
+      } finally {
+        showLoading(false);
+      }
+    }
+  });
+
+  createStockList();
+
+  if(stockSymbols.length > 0) {
+    selectStock(stockSymbols[0]);
+  }
+</script>
+
 </body>
 </html>
